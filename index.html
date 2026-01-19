@@ -447,6 +447,89 @@
             justify-content: flex-end;
         }
 
+        /* Modal Create Zone Section */
+        .modal-create-zone {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--mw-gray);
+        }
+
+        .create-zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--mw-gray-dark);
+            padding: 8px 0;
+        }
+
+        .create-zone-header:hover {
+            color: var(--mw-orange);
+        }
+
+        .expand-icon {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .create-zone-form {
+            margin-top: 12px;
+        }
+
+        .create-zone-form input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--mw-gray);
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .create-zone-form input[type="text"]:focus {
+            outline: none;
+            border-color: var(--mw-orange);
+        }
+
+        .create-zone-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .create-zone-row label {
+            font-size: 13px;
+            color: var(--mw-gray-dark);
+            white-space: nowrap;
+        }
+
+        .create-zone-row input[type="color"] {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--mw-gray);
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 2px;
+        }
+
+        .create-zone-row input[type="number"] {
+            width: 70px;
+            padding: 8px 10px;
+            border: 2px solid var(--mw-gray);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .create-zone-row input[type="number"]:focus {
+            outline: none;
+            border-color: var(--mw-orange);
+        }
+
+        .create-zone-form .btn {
+            width: 100%;
+        }
+
         /* Export Button */
         .export-btn {
             position: absolute;
@@ -1112,6 +1195,22 @@
                     <button class="btn btn-danger" onclick="unassignCounty()">Unassign</button>
                     <button class="btn btn-primary" onclick="assignCounty()">Assign</button>
                 </div>
+                <div class="modal-create-zone">
+                    <div class="create-zone-header" onclick="toggleCreateZoneSection()">
+                        <span>Or create new zone</span>
+                        <span class="expand-icon" id="createZoneExpandIcon">+</span>
+                    </div>
+                    <div class="create-zone-form" id="createZoneForm" style="display: none;">
+                        <input type="text" id="modalZoneName" placeholder="Zone name...">
+                        <div class="create-zone-row">
+                            <label>Color:</label>
+                            <input type="color" id="modalZoneColor" value="#f7941d">
+                            <label>Price: $</label>
+                            <input type="number" id="modalZonePrice" placeholder="0">
+                        </div>
+                        <button class="btn btn-primary" onclick="createAndAssignZone()">Create & Assign</button>
+                    </div>
+                </div>
                 <div class="modal-split-section" id="splitSection" style="display: none;">
                     <p>This county is already assigned. Split it between two zones?</p>
                     <button class="btn btn-split" onclick="startSplitMode()">Split County</button>
@@ -1727,6 +1826,13 @@
                 splitSection.style.display = 'none';
             }
 
+            // Reset create zone form
+            document.getElementById('createZoneForm').style.display = 'none';
+            document.getElementById('createZoneExpandIcon').textContent = '+';
+            document.getElementById('modalZoneName').value = '';
+            document.getElementById('modalZoneColor').value = getRandomColor();
+            document.getElementById('modalZonePrice').value = '';
+
             document.getElementById('modalOverlay').classList.add('visible');
 
             // Re-enable event listeners
@@ -2107,6 +2213,65 @@
             updateLegend();
         }
 
+        function toggleCreateZoneSection() {
+            const form = document.getElementById('createZoneForm');
+            const icon = document.getElementById('createZoneExpandIcon');
+            const isHidden = form.style.display === 'none';
+            form.style.display = isHidden ? 'block' : 'none';
+            icon.textContent = isHidden ? '−' : '+';
+        }
+
+        function createAndAssignZone() {
+            const nameInput = document.getElementById('modalZoneName');
+            const colorInput = document.getElementById('modalZoneColor');
+            const priceInput = document.getElementById('modalZonePrice');
+
+            const name = nameInput.value.trim();
+            if (!name) {
+                alert('Please enter a zone name');
+                return;
+            }
+
+            if (!selectedCounty) {
+                closeModal();
+                return;
+            }
+
+            // Check if the name matches a basic color
+            const colorFromName = getColorFromName(name);
+            const finalColor = colorFromName || sanitizeColor(colorInput.value);
+
+            // Get price adjustment
+            const priceValue = priceInput.value ? parseFloat(priceInput.value) : null;
+            const price = (priceValue !== null && !isNaN(priceValue) && priceValue !== 0) ? priceValue : null;
+
+            // Create the zone
+            const rep = {
+                id: 'rep_' + Date.now(),
+                name: name,
+                color: finalColor,
+                price: price
+            };
+
+            salesReps.push(rep);
+
+            // Assign the county to the new zone
+            assignments[selectedCounty.GEOID] = rep.id;
+
+            // Reset form
+            nameInput.value = '';
+            colorInput.value = getRandomColor();
+            priceInput.value = '';
+
+            // Update UI
+            saveToLocalStorage();
+            renderRepList();
+            updateStats();
+            updateLegend();
+            redrawMap();
+            closeModal();
+        }
+
         function editSalesRep(repId) {
             const rep = salesReps.find(r => r.id === repId);
             if (!rep) return;
@@ -2449,6 +2614,14 @@
             const colorFromName = getColorFromName(e.target.value);
             if (colorFromName) {
                 document.getElementById('repColor').value = colorFromName;
+            }
+        });
+
+        // Auto-update color picker in modal create zone form
+        document.getElementById('modalZoneName').addEventListener('input', (e) => {
+            const colorFromName = getColorFromName(e.target.value);
+            if (colorFromName) {
+                document.getElementById('modalZoneColor').value = colorFromName;
             }
         });
 
