@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# npm files (used only for development tooling)
+package.json
+package-lock.json
+
+# Development files
+PLAN.md
+
+# OS files
+.DS_Store
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Claude
+.claude/
